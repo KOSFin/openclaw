@@ -1,0 +1,74 @@
+services:
+  openclaw:
+    # Prefer official GHCR image. Override OPENCLAW_IMAGE in your Dokploy env.
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+    restart: unless-stopped
+    environment:
+      AUTH_USERNAME: ${AUTH_USERNAME:-}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-}
+
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
+      OPENCLAW_GATEWAY_PORT: ${OPENCLAW_GATEWAY_PORT:-18789}
+      OPENCLAW_GATEWAY_BIND: ${OPENCLAW_GATEWAY_BIND:-lan}
+
+      # State/workspace stay inside /data volume for managed Docker platforms.
+      OPENCLAW_STATE_DIR: /data/.openclaw
+      OPENCLAW_WORKSPACE_DIR: /data/workspace
+
+      # Dedicated proxy for model APIs + OAuth only (not global traffic).
+      OPENCLAW_MODELS_OAUTH_PROXY: ${OPENCLAW_MODELS_OAUTH_PROXY:-}
+
+      # Browser sidecar connection.
+      BROWSER_CDP_URL: ${BROWSER_CDP_URL:-http://browser:9222}
+      BROWSER_DEFAULT_PROFILE: ${BROWSER_DEFAULT_PROFILE:-openclaw}
+
+      # Typical model keys (keep only what you use).
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      XAI_API_KEY: ${XAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+
+      # Optional channels.
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      DISCORD_BOT_TOKEN: ${DISCORD_BOT_TOKEN:-}
+      SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
+      SLACK_APP_TOKEN: ${SLACK_APP_TOKEN:-}
+
+      PORT: 8080
+    volumes:
+      - openclaw-data:/data
+    depends_on:
+      browser:
+        condition: service_healthy
+    ports:
+      - "${OPENCLAW_HTTP_PORT:-8080}:8080"
+      - "${OPENCLAW_GATEWAY_PUBLIC_PORT:-18789}:18789"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:${PORT:-8080}/healthz || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  browser:
+    image: ${OPENCLAW_BROWSER_IMAGE:-ghcr.io/openclaw/openclaw-browser:latest}
+    restart: unless-stopped
+    shm_size: 2g
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-Etc/UTC}
+      CHROME_CLI: ${CHROME_CLI:---remote-debugging-address=0.0.0.0 --remote-debugging-port=9222}
+    volumes:
+      - browser-data:/config
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/9222' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  openclaw-data:
+  browser-data:

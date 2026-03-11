@@ -245,6 +245,34 @@ docker compose run --rm openclaw-cli onboard
 docker compose up -d openclaw-gateway
 ```
 
+### Dokploy/Coollabs style deploy (single app + browser sidecar)
+
+If you deploy with managed Docker platforms (for example Dokploy/Coollabs),
+use the repo-provided compose template:
+
+```bash
+cp docker-compose.dokploy.yml docker-compose.yml
+docker compose up -d
+```
+
+Or point your platform directly at `docker-compose.dokploy.yml`.
+
+Recommended image envs:
+
+```bash
+OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest
+OPENCLAW_BROWSER_IMAGE=ghcr.io/openclaw/openclaw-browser:latest
+```
+
+To route only model API + OAuth outbound traffic through proxy, set:
+
+```bash
+OPENCLAW_MODELS_OAUTH_PROXY=socks5://user:password@proxy-host:1080
+```
+
+This setting is OpenClaw-scoped and is not intended to globally proxy all
+container traffic.
+
 Note: run `docker compose ...` from the repo root. If you enabled
 `OPENCLAW_EXTRA_MOUNTS` or `OPENCLAW_HOME_VOLUME`, the setup script writes
 `docker-compose.extra.yml`; include it when running Compose elsewhere:
