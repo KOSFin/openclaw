@@ -13,7 +13,7 @@ services:
         "gateway",
         "--allow-unconfigured",
         "--bind",
-        "${OPENCLAW_GATEWAY_BIND:-lan}",
+        "lan",
         "--port",
         "18789",
       ]
@@ -23,7 +23,6 @@ services:
 
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-}
       OPENCLAW_GATEWAY_PORT: ${OPENCLAW_GATEWAY_PORT:-18789}
-      OPENCLAW_GATEWAY_BIND: ${OPENCLAW_GATEWAY_BIND:-lan}
 
       # State/workspace stay inside /data volume for managed Docker platforms.
       OPENCLAW_STATE_DIR: /data/.openclaw
