@@ -273,6 +273,19 @@ OPENCLAW_MODELS_OAUTH_PROXY=socks5://user:password@proxy-host:1080
 This setting is OpenClaw-scoped and is not intended to globally proxy all
 container traffic.
 
+For non-loopback gateway binds in managed ingress, configure Control UI origins
+through env without editing `openclaw.json`:
+
+```bash
+OPENCLAW_GATEWAY_CONTROLUI_ALLOWED_ORIGINS=https://your-domain.example
+```
+
+Or (less strict) enable Host-header origin fallback mode:
+
+```bash
+OPENCLAW_GATEWAY_CONTROLUI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK=true
+```
+
 If your platform attaches root-owned named volumes and logs show
 `EACCES: permission denied, mkdir '/data/.openclaw'`, run the OpenClaw
 service as root in the Dokploy compose:

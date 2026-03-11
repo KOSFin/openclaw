@@ -110,10 +110,25 @@ describe("resolveGatewayRuntimeConfig", () => {
 
   describe("token/password auth modes", () => {
     let originalToken: string | undefined;
+    let originalControlUiAllowedOrigins: string | undefined;
+    let originalControlUiAllowedOriginsLegacy: string | undefined;
+    let originalControlUiHostHeaderFallback: string | undefined;
+    let originalControlUiHostHeaderFallbackLegacy: string | undefined;
 
     beforeEach(() => {
       originalToken = process.env.OPENCLAW_GATEWAY_TOKEN;
+      originalControlUiAllowedOrigins = process.env.OPENCLAW_GATEWAY_CONTROLUI_ALLOWED_ORIGINS;
+      originalControlUiAllowedOriginsLegacy =
+        process.env.OPENCLAW_GATEWAY_CONTROL_UI_ALLOWED_ORIGINS;
+      originalControlUiHostHeaderFallback =
+        process.env.OPENCLAW_GATEWAY_CONTROLUI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK;
+      originalControlUiHostHeaderFallbackLegacy =
+        process.env.OPENCLAW_GATEWAY_CONTROL_UI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK;
       delete process.env.OPENCLAW_GATEWAY_TOKEN;
+      delete process.env.OPENCLAW_GATEWAY_CONTROLUI_ALLOWED_ORIGINS;
+      delete process.env.OPENCLAW_GATEWAY_CONTROL_UI_ALLOWED_ORIGINS;
+      delete process.env.OPENCLAW_GATEWAY_CONTROLUI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK;
+      delete process.env.OPENCLAW_GATEWAY_CONTROL_UI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK;
     });
 
     afterEach(() => {
@@ -121,6 +136,29 @@ describe("resolveGatewayRuntimeConfig", () => {
         process.env.OPENCLAW_GATEWAY_TOKEN = originalToken;
       } else {
         delete process.env.OPENCLAW_GATEWAY_TOKEN;
+      }
+      if (originalControlUiAllowedOrigins !== undefined) {
+        process.env.OPENCLAW_GATEWAY_CONTROLUI_ALLOWED_ORIGINS = originalControlUiAllowedOrigins;
+      } else {
+        delete process.env.OPENCLAW_GATEWAY_CONTROLUI_ALLOWED_ORIGINS;
+      }
+      if (originalControlUiAllowedOriginsLegacy !== undefined) {
+        process.env.OPENCLAW_GATEWAY_CONTROL_UI_ALLOWED_ORIGINS =
+          originalControlUiAllowedOriginsLegacy;
+      } else {
+        delete process.env.OPENCLAW_GATEWAY_CONTROL_UI_ALLOWED_ORIGINS;
+      }
+      if (originalControlUiHostHeaderFallback !== undefined) {
+        process.env.OPENCLAW_GATEWAY_CONTROLUI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK =
+          originalControlUiHostHeaderFallback;
+      } else {
+        delete process.env.OPENCLAW_GATEWAY_CONTROLUI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK;
+      }
+      if (originalControlUiHostHeaderFallbackLegacy !== undefined) {
+        process.env.OPENCLAW_GATEWAY_CONTROL_UI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK =
+          originalControlUiHostHeaderFallbackLegacy;
+      } else {
+        delete process.env.OPENCLAW_GATEWAY_CONTROL_UI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK;
       }
     });
 
@@ -228,6 +266,40 @@ describe("resolveGatewayRuntimeConfig", () => {
         },
         port: 18789,
       });
+      expect(result.bindHost).toBe("0.0.0.0");
+    });
+
+    it("allows non-loopback control UI when allowed origins are provided via env", async () => {
+      process.env.OPENCLAW_GATEWAY_CONTROLUI_ALLOWED_ORIGINS =
+        "https://openclaw.example.com, https://admin.example.com";
+
+      const result = await resolveGatewayRuntimeConfig({
+        cfg: {
+          gateway: {
+            bind: "lan",
+            auth: TOKEN_AUTH,
+          },
+        },
+        port: 18789,
+      });
+
+      expect(result.bindHost).toBe("0.0.0.0");
+    });
+
+    it("allows non-loopback control UI when host-header fallback is enabled via env", async () => {
+      process.env.OPENCLAW_GATEWAY_CONTROLUI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK =
+        "true";
+
+      const result = await resolveGatewayRuntimeConfig({
+        cfg: {
+          gateway: {
+            bind: "lan",
+            auth: TOKEN_AUTH,
+          },
+        },
+        port: 18789,
+      });
+
       expect(result.bindHost).toBe("0.0.0.0");
     });
   });

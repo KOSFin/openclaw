@@ -19,6 +19,71 @@ import {
 } from "./net.js";
 import { mergeGatewayTailscaleConfig } from "./startup-auth.js";
 
+const CONTROL_UI_ALLOWED_ORIGINS_ENV_KEYS = [
+  "OPENCLAW_GATEWAY_CONTROLUI_ALLOWED_ORIGINS",
+  "OPENCLAW_GATEWAY_CONTROL_UI_ALLOWED_ORIGINS",
+] as const;
+
+const CONTROL_UI_HOST_HEADER_FALLBACK_ENV_KEYS = [
+  "OPENCLAW_GATEWAY_CONTROLUI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK",
+  "OPENCLAW_GATEWAY_CONTROL_UI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK",
+] as const;
+
+function parseBooleanEnv(value: string | undefined): boolean | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  return undefined;
+}
+
+function resolveFirstNonEmptyEnv(keys: readonly string[]): string | undefined {
+  for (const key of keys) {
+    const raw = process.env[key];
+    if (typeof raw === "string" && raw.trim().length > 0) {
+      return raw.trim();
+    }
+  }
+  return undefined;
+}
+
+function parseControlUiAllowedOriginsFromEnv(): string[] {
+  const raw = resolveFirstNonEmptyEnv(CONTROL_UI_ALLOWED_ORIGINS_ENV_KEYS);
+  if (!raw) {
+    return [];
+  }
+  if (raw.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return [...new Set(parsed.map((value) => String(value).trim()).filter(Boolean))];
+      }
+    } catch {
+      // Fall back to comma-separated parsing below.
+    }
+  }
+  return [...new Set(raw.split(",").map((value) => value.trim()).filter(Boolean))];
+}
+
+function resolveControlUiHostHeaderFallbackFromEnv(): boolean | undefined {
+  for (const key of CONTROL_UI_HOST_HEADER_FALLBACK_ENV_KEYS) {
+    const parsed = parseBooleanEnv(process.env[key]);
+    if (parsed !== undefined) {
+      return parsed;
+    }
+  }
+  return undefined;
+}
+
 export type GatewayRuntimeConfig = {
   bindHost: string;
   controlUiEnabled: boolean;
@@ -115,11 +180,16 @@ export async function resolveGatewayRuntimeConfig(params: {
     process.env.OPENCLAW_SKIP_CANVAS_HOST !== "1" && params.cfg.canvasHost?.enabled !== false;
 
   const trustedProxies = params.cfg.gateway?.trustedProxies ?? [];
-  const controlUiAllowedOrigins = (params.cfg.gateway?.controlUi?.allowedOrigins ?? [])
+  const configControlUiAllowedOrigins = (params.cfg.gateway?.controlUi?.allowedOrigins ?? [])
     .map((value) => value.trim())
     .filter(Boolean);
+  const envControlUiAllowedOrigins = parseControlUiAllowedOriginsFromEnv();
+  const controlUiAllowedOrigins =
+    envControlUiAllowedOrigins.length > 0 ? envControlUiAllowedOrigins : configControlUiAllowedOrigins;
+  const envDangerousFallback = resolveControlUiHostHeaderFallbackFromEnv();
   const dangerouslyAllowHostHeaderOriginFallback =
-    params.cfg.gateway?.controlUi?.dangerouslyAllowHostHeaderOriginFallback === true;
+    envDangerousFallback ??
+    (params.cfg.gateway?.controlUi?.dangerouslyAllowHostHeaderOriginFallback === true);
 
   assertGatewayAuthConfigured(resolvedAuth, params.cfg.gateway?.auth);
   if (tailscaleMode === "funnel" && authMode !== "password") {
@@ -142,7 +212,7 @@ export async function resolveGatewayRuntimeConfig(params: {
     !dangerouslyAllowHostHeaderOriginFallback
   ) {
     throw new Error(
-      "non-loopback Control UI requires gateway.controlUi.allowedOrigins (set explicit origins), or set gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback=true to use Host-header origin fallback mode",
+      "non-loopback Control UI requires gateway.controlUi.allowedOrigins (set explicit origins), OPENCLAW_GATEWAY_CONTROLUI_ALLOWED_ORIGINS, or set gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback=true / OPENCLAW_GATEWAY_CONTROLUI_DANGEROUSLY_ALLOW_HOST_HEADER_ORIGIN_FALLBACK=true",
     );
   }
 
