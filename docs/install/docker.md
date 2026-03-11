@@ -261,7 +261,7 @@ Recommended image envs:
 
 ```bash
 OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest
-OPENCLAW_BROWSER_IMAGE=ghcr.io/openclaw/openclaw-browser:latest
+OPENCLAW_BROWSER_IMAGE=coollabsio/openclaw-browser:latest
 ```
 
 To route only model API + OAuth outbound traffic through proxy, set:

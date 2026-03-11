@@ -53,7 +53,9 @@ services:
       retries: 5
 
   browser:
-    image: ${OPENCLAW_BROWSER_IMAGE:-ghcr.io/openclaw/openclaw-browser:latest}
+    # GHCR browser image may require auth in some environments.
+    # Use the public Coollabs browser image by default for managed deploys.
+    image: ${OPENCLAW_BROWSER_IMAGE:-coollabsio/openclaw-browser:latest}
     restart: unless-stopped
     shm_size: 2g
     environment:
