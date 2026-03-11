@@ -1,41 +1,58 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { ProxyAgent, EnvHttpProxyAgent, undiciFetch, proxyAgentSpy, envAgentSpy, getLastAgent } =
-  vi.hoisted(() => {
-    const undiciFetch = vi.fn();
-    const proxyAgentSpy = vi.fn();
-    const envAgentSpy = vi.fn();
-    class ProxyAgent {
-      static lastCreated: ProxyAgent | undefined;
-      proxyUrl: string;
-      constructor(proxyUrl: string) {
-        this.proxyUrl = proxyUrl;
-        ProxyAgent.lastCreated = this;
-        proxyAgentSpy(proxyUrl);
-      }
-    }
-    class EnvHttpProxyAgent {
-      static lastCreated: EnvHttpProxyAgent | undefined;
-      constructor() {
-        EnvHttpProxyAgent.lastCreated = this;
-        envAgentSpy();
-      }
-    }
+const {
+  ProxyAgent,
+  EnvHttpProxyAgent,
+  undiciFetch,
+  proxyAgentSpy,
+  envAgentSpy,
+  getLastAgent,
+  setGlobalDispatcherSpy,
+  getGlobalDispatcherMock,
+} = vi.hoisted(() => {
+  const undiciFetch = vi.fn();
+  const proxyAgentSpy = vi.fn();
+  const envAgentSpy = vi.fn();
+  const setGlobalDispatcherSpy = vi.fn();
+  const fakeDispatcher = { _isFakeDispatcher: true };
+  const getGlobalDispatcherMock = vi.fn().mockReturnValue(fakeDispatcher);
 
-    return {
-      ProxyAgent,
-      EnvHttpProxyAgent,
-      undiciFetch,
-      proxyAgentSpy,
-      envAgentSpy,
-      getLastAgent: () => ProxyAgent.lastCreated,
-    };
-  });
+  class ProxyAgent {
+    static lastCreated: ProxyAgent | undefined;
+    proxyUrl: string;
+    destroy = vi.fn().mockResolvedValue(undefined);
+    constructor(proxyUrl: string) {
+      this.proxyUrl = proxyUrl;
+      ProxyAgent.lastCreated = this;
+      proxyAgentSpy(proxyUrl);
+    }
+  }
+  class EnvHttpProxyAgent {
+    static lastCreated: EnvHttpProxyAgent | undefined;
+    constructor() {
+      EnvHttpProxyAgent.lastCreated = this;
+      envAgentSpy();
+    }
+  }
+
+  return {
+    ProxyAgent,
+    EnvHttpProxyAgent,
+    undiciFetch,
+    proxyAgentSpy,
+    envAgentSpy,
+    getLastAgent: () => ProxyAgent.lastCreated,
+    setGlobalDispatcherSpy,
+    getGlobalDispatcherMock,
+  };
+});
 
 vi.mock("undici", () => ({
   ProxyAgent,
   EnvHttpProxyAgent,
   fetch: undiciFetch,
+  getGlobalDispatcher: getGlobalDispatcherMock,
+  setGlobalDispatcher: setGlobalDispatcherSpy,
 }));
 
 import {
@@ -180,6 +197,7 @@ describe("resolveModelsOauthProxyFetchFromEnv", () => {
 });
 
 describe("withScopedModelsOauthProxyEnv", () => {
+  beforeEach(() => vi.clearAllMocks());
   afterEach(() => vi.unstubAllEnvs());
 
   it("does not modify env when dedicated proxy is unset", async () => {
@@ -189,11 +207,14 @@ describe("withScopedModelsOauthProxyEnv", () => {
     await withScopedModelsOauthProxyEnv(async () => {
       expect(process.env.HTTPS_PROXY).toBe(original);
     });
+
+    expect(setGlobalDispatcherSpy).not.toHaveBeenCalled();
   });
 
   it("applies proxy only inside scope and restores previous env", async () => {
     vi.stubEnv("OPENCLAW_MODELS_OAUTH_PROXY", "socks5://proxy.test:1080");
     const previousHttps = process.env.HTTPS_PROXY;
+    const fakeDispatcher = getGlobalDispatcherMock();
 
     await withScopedModelsOauthProxyEnv(async () => {
       expect(process.env.HTTPS_PROXY).toBe("socks5://proxy.test:1080");
@@ -202,5 +223,40 @@ describe("withScopedModelsOauthProxyEnv", () => {
     });
 
     expect(process.env.HTTPS_PROXY).toBe(previousHttps);
+  });
+
+  it("installs ProxyAgent as global dispatcher inside scope and restores after", async () => {
+    vi.stubEnv("OPENCLAW_MODELS_OAUTH_PROXY", "socks5://proxy.test:1080");
+    const fakeDispatcher = getGlobalDispatcherMock();
+
+    let agentInsideScope: unknown;
+    await withScopedModelsOauthProxyEnv(async () => {
+      agentInsideScope = setGlobalDispatcherSpy.mock.calls[0]?.[0];
+      expect(agentInsideScope).toBeInstanceOf(ProxyAgent);
+      expect((agentInsideScope as InstanceType<typeof ProxyAgent>).proxyUrl).toBe(
+        "socks5://proxy.test:1080",
+      );
+    });
+
+    // previous dispatcher should be restored
+    const restoreCall = setGlobalDispatcherSpy.mock.calls[1];
+    expect(restoreCall?.[0]).toBe(fakeDispatcher);
+    // proxy agent should be destroyed
+    expect((agentInsideScope as InstanceType<typeof ProxyAgent>).destroy).toHaveBeenCalled();
+  });
+
+  it("restores env and dispatcher even when fn throws", async () => {
+    vi.stubEnv("OPENCLAW_MODELS_OAUTH_PROXY", "http://proxy.test:8080");
+    const previousHttps = process.env.HTTPS_PROXY;
+    const fakeDispatcher = getGlobalDispatcherMock();
+
+    await expect(
+      withScopedModelsOauthProxyEnv(async () => {
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+
+    expect(process.env.HTTPS_PROXY).toBe(previousHttps);
+    expect(setGlobalDispatcherSpy).toHaveBeenCalledWith(fakeDispatcher);
   });
 });

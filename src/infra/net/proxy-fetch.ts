@@ -1,4 +1,4 @@
-import { EnvHttpProxyAgent, ProxyAgent, fetch as undiciFetch } from "undici";
+import { EnvHttpProxyAgent, ProxyAgent, fetch as undiciFetch, getGlobalDispatcher, setGlobalDispatcher } from "undici";
 import { logWarn } from "../../logger.js";
 
 const MODELS_OAUTH_PROXY_ENV_KEYS = ["OPENCLAW_MODELS_OAUTH_PROXY", "OPENCLAW_MODEL_OAUTH_PROXY"];
@@ -129,6 +129,20 @@ export async function withScopedModelsOauthProxyEnv<T>(fn: () => Promise<T>): Pr
     process.env[key] = proxyUrl;
   }
 
+  // Also swap the undici global dispatcher so OpenAI/Google SDKs (which use global fetch → undici)
+  // actually route through the proxy. Env-var mutation alone is insufficient because those SDKs
+  // create HTTP clients once and never re-read proxy env vars per-request.
+  const previousDispatcher = getGlobalDispatcher();
+  let proxyAgent: ProxyAgent | null = null;
+  try {
+    proxyAgent = new ProxyAgent(proxyUrl);
+    setGlobalDispatcher(proxyAgent);
+  } catch (err) {
+    logWarn(
+      `OPENCLAW_MODELS_OAUTH_PROXY: failed to install global proxy dispatcher — LLM requests may bypass proxy: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
   try {
     return await fn();
   } finally {
@@ -139,6 +153,14 @@ export async function withScopedModelsOauthProxyEnv<T>(fn: () => Promise<T>): Pr
       } else {
         delete process.env[key];
       }
+    }
+    if (proxyAgent !== null) {
+      try {
+        setGlobalDispatcher(previousDispatcher);
+      } catch {
+        // Best-effort restore
+      }
+      proxyAgent.destroy().catch(() => {});
     }
   }
 }
