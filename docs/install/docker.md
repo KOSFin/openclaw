@@ -273,6 +273,16 @@ OPENCLAW_MODELS_OAUTH_PROXY=socks5://user:password@proxy-host:1080
 This setting is OpenClaw-scoped and is not intended to globally proxy all
 container traffic.
 
+If your platform attaches root-owned named volumes and logs show
+`EACCES: permission denied, mkdir '/data/.openclaw'`, run the OpenClaw
+service as root in the Dokploy compose:
+
+```yaml
+services:
+  openclaw:
+    user: "0:0"
+```
+
 Note: run `docker compose ...` from the repo root. If you enabled
 `OPENCLAW_EXTRA_MOUNTS` or `OPENCLAW_HOME_VOLUME`, the setup script writes
 `docker-compose.extra.yml`; include it when running Compose elsewhere:
