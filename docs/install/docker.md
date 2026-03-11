@@ -262,6 +262,10 @@ The Dokploy template also runs a startup pre-step that writes
 gateway starts. This keeps older images (that may not honor Control UI env
 overrides) from crash-looping on non-loopback binds.
 
+For Dokploy domain routing with this template, use internal container port
+`18789` (not `8080`), because the gateway and Control UI are served from the
+gateway port.
+
 Recommended image envs:
 
 ```bash
