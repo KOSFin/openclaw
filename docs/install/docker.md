@@ -257,6 +257,11 @@ docker compose up -d
 
 Or point your platform directly at `docker-compose.dokploy.yml`.
 
+The Dokploy template also runs a startup pre-step that writes
+`gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback=true` before the
+gateway starts. This keeps older images (that may not honor Control UI env
+overrides) from crash-looping on non-loopback binds.
+
 Recommended image envs:
 
 ```bash

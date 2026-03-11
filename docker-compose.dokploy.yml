@@ -8,14 +8,9 @@ services:
     restart: unless-stopped
     command:
       [
-        "node",
-        "openclaw.mjs",
-        "gateway",
-        "--allow-unconfigured",
-        "--bind",
-        "lan",
-        "--port",
-        "18789",
+        "sh",
+        "-lc",
+        "node openclaw.mjs config set gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback true || true; exec node openclaw.mjs gateway --allow-unconfigured --bind lan --port 18789",
       ]
     environment:
       AUTH_USERNAME: ${AUTH_USERNAME:-}
