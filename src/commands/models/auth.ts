@@ -22,6 +22,7 @@ import type { ProviderAuthResult, ProviderPlugin } from "../../plugins/types.js"
 import type { RuntimeEnv } from "../../runtime.js";
 import { stylePromptHint, stylePromptMessage } from "../../terminal/prompt-style.js";
 import { createClackPrompter } from "../../wizard/clack-prompter.js";
+import { withScopedModelsOauthProxyEnv } from "../../infra/net/proxy-fetch.js";
 import { validateAnthropicSetupToken } from "../auth-token.js";
 import { isRemoteEnvironment } from "../oauth-env.js";
 import { createVpsAwareOAuthHandlers } from "../oauth-flow.js";
@@ -410,20 +411,22 @@ export async function modelsAuthLoginCommand(opts: LoginOptions, runtime: Runtim
   }
 
   const isRemote = isRemoteEnvironment();
-  const result: ProviderAuthResult = await chosenMethod.run({
-    config,
-    agentDir,
-    workspaceDir,
-    prompter,
-    runtime,
-    isRemote,
-    openUrl: async (url) => {
-      await openUrl(url);
-    },
-    oauth: {
-      createVpsAwareHandlers: (params) => createVpsAwareOAuthHandlers(params),
-    },
-  });
+  const result: ProviderAuthResult = await withScopedModelsOauthProxyEnv(async () =>
+    await chosenMethod.run({
+      config,
+      agentDir,
+      workspaceDir,
+      prompter,
+      runtime,
+      isRemote,
+      openUrl: async (url) => {
+        await openUrl(url);
+      },
+      oauth: {
+        createVpsAwareHandlers: (params) => createVpsAwareOAuthHandlers(params),
+      },
+    }),
+  );
 
   for (const profile of result.profiles) {
     upsertAuthProfile({

@@ -13,7 +13,7 @@ import type {
   MediaUnderstandingModelConfig,
 } from "../config/types.tools.js";
 import { logVerbose, shouldLogVerbose } from "../globals.js";
-import { resolveProxyFetchFromEnv } from "../infra/net/proxy-fetch.js";
+import { resolveModelsOauthProxyFetchFromEnv } from "../infra/net/proxy-fetch.js";
 import { resolvePreferredOpenClawTmpDir } from "../infra/tmp-openclaw-dir.js";
 import { runExec } from "../process/exec.js";
 import { MediaAttachmentCache } from "./attachments.js";
@@ -480,9 +480,8 @@ export async function runProviderEntry(params: {
     throw new Error(`Media provider not available: ${providerId}`);
   }
 
-  // Resolve proxy-aware fetch from env vars (HTTPS_PROXY, HTTP_PROXY, etc.)
-  // so provider HTTP calls are routed through the proxy when configured.
-  const fetchFn = resolveProxyFetchFromEnv();
+  // Route model-provider HTTP calls through a dedicated model/oauth proxy when configured.
+  const fetchFn = resolveModelsOauthProxyFetchFromEnv();
 
   if (capability === "audio") {
     if (!provider.transcribeAudio) {

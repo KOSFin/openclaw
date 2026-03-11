@@ -7,6 +7,7 @@ import {
   estimateTokens,
   SessionManager,
 } from "@mariozechner/pi-coding-agent";
+import { withScopedModelsOauthProxyEnv } from "../../infra/net/proxy-fetch.js";
 import { resolveHeartbeatPrompt } from "../../auto-reply/heartbeat.js";
 import type { ReasoningLevel, ThinkLevel } from "../../auto-reply/thinking.js";
 import { resolveChannelCapabilities } from "../../config/channel-capabilities.js";
@@ -791,8 +792,8 @@ export async function compactEmbeddedPiSessionDirect(
         // Measure compactedCount from the original pre-limiting transcript so compaction
         // lifecycle metrics represent total reduction through the compaction pipeline.
         const messageCountCompactionInput = messageCountOriginal;
-        const result = await compactWithSafetyTimeout(() =>
-          session.compact(params.customInstructions),
+        const result = await withScopedModelsOauthProxyEnv(async () =>
+          await compactWithSafetyTimeout(() => session.compact(params.customInstructions)),
         );
         // Estimate tokens after compaction by summing token estimates for remaining messages
         let tokensAfter: number | undefined;

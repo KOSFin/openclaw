@@ -12,6 +12,10 @@ import { resolveChannelCapabilities } from "../../../config/channel-capabilities
 import type { OpenClawConfig } from "../../../config/config.js";
 import { getMachineDisplayName } from "../../../infra/machine-name.js";
 import { ensureGlobalUndiciStreamTimeouts } from "../../../infra/net/undici-global-dispatcher.js";
+import {
+  resolveModelsOauthProxyUrlFromEnv,
+  withScopedModelsOauthProxyEnv,
+} from "../../../infra/net/proxy-fetch.js";
 import { MAX_IMAGE_BYTES } from "../../../media/constants.js";
 import { getGlobalHookRunner } from "../../../plugins/hook-runner-global.js";
 import type {
@@ -1240,10 +1244,16 @@ export async function runEmbeddedAttempt(
         ensureCustomApiRegistered(params.model.api, ollamaStreamFn);
       } else if (params.model.api === "openai-responses" && params.provider === "openai") {
         const wsApiKey = await params.authStorage.getApiKey(params.provider);
-        if (wsApiKey) {
+        const modelsOauthProxyUrl = resolveModelsOauthProxyUrlFromEnv();
+        if (wsApiKey && !modelsOauthProxyUrl) {
           activeSession.agent.streamFn = createOpenAIWebSocketStreamFn(wsApiKey, params.sessionId, {
             signal: runAbortController.signal,
           });
+        } else if (wsApiKey && modelsOauthProxyUrl) {
+          log.info(
+            `[ws-stream] dedicated models/oauth proxy configured; using HTTP transport for provider=${params.provider}`,
+          );
+          activeSession.agent.streamFn = streamSimple;
         } else {
           log.warn(`[ws-stream] no API key for provider=${params.provider}; using HTTP transport`);
           activeSession.agent.streamFn = streamSimple;
@@ -1777,11 +1787,13 @@ export async function runEmbeddedAttempt(
 
           // Only pass images option if there are actually images to pass
           // This avoids potential issues with models that don't expect the images parameter
-          if (imageResult.images.length > 0) {
-            await abortable(activeSession.prompt(effectivePrompt, { images: imageResult.images }));
-          } else {
-            await abortable(activeSession.prompt(effectivePrompt));
-          }
+          await withScopedModelsOauthProxyEnv(async () => {
+            if (imageResult.images.length > 0) {
+              await abortable(activeSession.prompt(effectivePrompt, { images: imageResult.images }));
+            } else {
+              await abortable(activeSession.prompt(effectivePrompt));
+            }
+          });
         } catch (err) {
           promptError = err;
           promptErrorSource = "prompt";

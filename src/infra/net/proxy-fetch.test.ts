@@ -38,7 +38,12 @@ vi.mock("undici", () => ({
   fetch: undiciFetch,
 }));
 
-import { makeProxyFetch, resolveProxyFetchFromEnv } from "./proxy-fetch.js";
+import {
+  makeProxyFetch,
+  resolveModelsOauthProxyFetchFromEnv,
+  withScopedModelsOauthProxyEnv,
+  resolveProxyFetchFromEnv,
+} from "./proxy-fetch.js";
 
 describe("makeProxyFetch", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -136,5 +141,66 @@ describe("resolveProxyFetchFromEnv", () => {
 
     const fetchFn = resolveProxyFetchFromEnv();
     expect(fetchFn).toBeUndefined();
+  });
+});
+
+describe("resolveModelsOauthProxyFetchFromEnv", () => {
+  beforeEach(() => vi.clearAllMocks());
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("returns undefined when dedicated proxy env vars are unset", () => {
+    vi.stubEnv("OPENCLAW_MODELS_OAUTH_PROXY", "");
+    vi.stubEnv("OPENCLAW_MODEL_OAUTH_PROXY", "");
+
+    expect(resolveModelsOauthProxyFetchFromEnv()).toBeUndefined();
+  });
+
+  it("uses OPENCLAW_MODELS_OAUTH_PROXY when set", async () => {
+    vi.stubEnv("OPENCLAW_MODELS_OAUTH_PROXY", "socks5://proxy.test:1080");
+    undiciFetch.mockResolvedValue({ ok: true });
+
+    const fetchFn = resolveModelsOauthProxyFetchFromEnv();
+    expect(fetchFn).toBeDefined();
+
+    await fetchFn!("https://api.example.com");
+    expect(proxyAgentSpy).toHaveBeenCalledWith("socks5://proxy.test:1080");
+  });
+
+  it("falls back to OPENCLAW_MODEL_OAUTH_PROXY alias", async () => {
+    vi.stubEnv("OPENCLAW_MODELS_OAUTH_PROXY", "");
+    vi.stubEnv("OPENCLAW_MODEL_OAUTH_PROXY", "http://proxy.test:8080");
+    undiciFetch.mockResolvedValue({ ok: true });
+
+    const fetchFn = resolveModelsOauthProxyFetchFromEnv();
+    expect(fetchFn).toBeDefined();
+
+    await fetchFn!("https://api.example.com");
+    expect(proxyAgentSpy).toHaveBeenCalledWith("http://proxy.test:8080");
+  });
+});
+
+describe("withScopedModelsOauthProxyEnv", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("does not modify env when dedicated proxy is unset", async () => {
+    vi.stubEnv("OPENCLAW_MODELS_OAUTH_PROXY", "");
+    const original = process.env.HTTPS_PROXY;
+
+    await withScopedModelsOauthProxyEnv(async () => {
+      expect(process.env.HTTPS_PROXY).toBe(original);
+    });
+  });
+
+  it("applies proxy only inside scope and restores previous env", async () => {
+    vi.stubEnv("OPENCLAW_MODELS_OAUTH_PROXY", "socks5://proxy.test:1080");
+    const previousHttps = process.env.HTTPS_PROXY;
+
+    await withScopedModelsOauthProxyEnv(async () => {
+      expect(process.env.HTTPS_PROXY).toBe("socks5://proxy.test:1080");
+      expect(process.env.HTTP_PROXY).toBe("socks5://proxy.test:1080");
+      expect(process.env.ALL_PROXY).toBe("socks5://proxy.test:1080");
+    });
+
+    expect(process.env.HTTPS_PROXY).toBe(previousHttps);
   });
 });

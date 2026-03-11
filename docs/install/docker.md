@@ -76,6 +76,22 @@ Optional env vars:
 - `OPENCLAW_BROWSER_RENDERER_PROCESS_LIMIT=<N>` — set Chromium renderer process
   limit; set to `0` to skip the flag and use Chromium default behavior.
 
+### Outbound API and OAuth proxy
+
+For Docker deployments, you can route outbound model API and OAuth traffic
+through a dedicated proxy by setting an OpenClaw-scoped env var before running
+`docker-setup.sh` or `docker compose`.
+
+Recommended (single switch):
+
+```bash
+export OPENCLAW_MODELS_OAUTH_PROXY="socks5://user:password@proxy-host:1080"
+./docker-setup.sh
+```
+
+This proxy is intended only for model API and OAuth-related outbound calls.
+OpenClaw does not globally proxy all traffic from this setting.
+
 After it finishes:
 
 - Open `http://127.0.0.1:18789/` in your browser.

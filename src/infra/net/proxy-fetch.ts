@@ -1,6 +1,16 @@
 import { EnvHttpProxyAgent, ProxyAgent, fetch as undiciFetch } from "undici";
 import { logWarn } from "../../logger.js";
 
+const MODELS_OAUTH_PROXY_ENV_KEYS = ["OPENCLAW_MODELS_OAUTH_PROXY", "OPENCLAW_MODEL_OAUTH_PROXY"];
+const MODELS_OAUTH_SCOPED_PROXY_TARGET_ENV_KEYS = [
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "ALL_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "all_proxy",
+] as const;
+
 export const PROXY_FETCH_PROXY_URL = Symbol.for("openclaw.proxyFetch.proxyUrl");
 type ProxyFetchWithMetadata = typeof fetch & {
   [PROXY_FETCH_PROXY_URL]?: string;
@@ -71,5 +81,64 @@ export function resolveProxyFetchFromEnv(): typeof fetch | undefined {
       `Proxy env var set but agent creation failed — falling back to direct fetch: ${err instanceof Error ? err.message : String(err)}`,
     );
     return undefined;
+  }
+}
+
+export function resolveModelsOauthProxyUrlFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  for (const key of MODELS_OAUTH_PROXY_ENV_KEYS) {
+    const proxyUrl = env[key]?.trim();
+    if (proxyUrl) {
+      return proxyUrl;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Resolve a dedicated proxy fetch for model API + OAuth traffic only.
+ * Uses explicit OpenClaw-scoped env vars and does not rely on NO_PROXY logic.
+ */
+export function resolveModelsOauthProxyFetchFromEnv(): typeof fetch | undefined {
+  const proxyUrl = resolveModelsOauthProxyUrlFromEnv();
+  if (!proxyUrl) {
+    return undefined;
+  }
+  try {
+    return makeProxyFetch(proxyUrl);
+  } catch (err) {
+    logWarn(
+      `OPENCLAW_MODELS_OAUTH_PROXY is set but proxy fetch initialization failed — falling back to direct fetch: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return undefined;
+  }
+}
+
+export async function withScopedModelsOauthProxyEnv<T>(fn: () => Promise<T>): Promise<T> {
+  const proxyUrl = resolveModelsOauthProxyUrlFromEnv();
+  if (!proxyUrl) {
+    return await fn();
+  }
+
+  const previous: Partial<
+    Record<(typeof MODELS_OAUTH_SCOPED_PROXY_TARGET_ENV_KEYS)[number], string | undefined>
+  > = {};
+  for (const key of MODELS_OAUTH_SCOPED_PROXY_TARGET_ENV_KEYS) {
+    previous[key] = process.env[key];
+    process.env[key] = proxyUrl;
+  }
+
+  try {
+    return await fn();
+  } finally {
+    for (const key of MODELS_OAUTH_SCOPED_PROXY_TARGET_ENV_KEYS) {
+      const value = previous[key];
+      if (typeof value === "string") {
+        process.env[key] = value;
+      } else {
+        delete process.env[key];
+      }
+    }
   }
 }

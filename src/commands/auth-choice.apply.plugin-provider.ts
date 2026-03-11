@@ -8,6 +8,7 @@ import { upsertAuthProfile } from "../agents/auth-profiles.js";
 import { resolveDefaultAgentWorkspaceDir } from "../agents/workspace.js";
 import { enablePluginInConfig } from "../plugins/enable.js";
 import { resolvePluginProviders } from "../plugins/providers.js";
+import { withScopedModelsOauthProxyEnv } from "../infra/net/proxy-fetch.js";
 import type { ApplyAuthChoiceParams, ApplyAuthChoiceResult } from "./auth-choice.apply.js";
 import { isRemoteEnvironment } from "./oauth-env.js";
 import { createVpsAwareOAuthHandlers } from "./oauth-flow.js";
@@ -71,20 +72,22 @@ export async function applyAuthChoicePluginProvider(
   }
 
   const isRemote = isRemoteEnvironment();
-  const result = await method.run({
-    config: nextConfig,
-    agentDir,
-    workspaceDir,
-    prompter: params.prompter,
-    runtime: params.runtime,
-    isRemote,
-    openUrl: async (url) => {
-      await openUrl(url);
-    },
-    oauth: {
-      createVpsAwareHandlers: (opts) => createVpsAwareOAuthHandlers(opts),
-    },
-  });
+  const result = await withScopedModelsOauthProxyEnv(async () =>
+    await method.run({
+      config: nextConfig,
+      agentDir,
+      workspaceDir,
+      prompter: params.prompter,
+      runtime: params.runtime,
+      isRemote,
+      openUrl: async (url) => {
+        await openUrl(url);
+      },
+      oauth: {
+        createVpsAwareHandlers: (opts) => createVpsAwareOAuthHandlers(opts),
+      },
+    }),
+  );
 
   if (result.configPatch) {
     nextConfig = mergeConfigPatch(nextConfig, result.configPatch);

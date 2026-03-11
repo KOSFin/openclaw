@@ -1,4 +1,5 @@
 import type { ApplyAuthChoiceParams, ApplyAuthChoiceResult } from "./auth-choice.apply.js";
+import { resolveModelsOauthProxyFetchFromEnv } from "../infra/net/proxy-fetch.js";
 import { loginChutes } from "./chutes-oauth.js";
 import { isRemoteEnvironment } from "./oauth-env.js";
 import { createVpsAwareOAuthHandlers } from "./oauth-flow.js";
@@ -65,6 +66,7 @@ export async function applyAuthChoiceOAuth(
         onAuth,
         onPrompt,
         onProgress: (msg) => spin.update(msg),
+        fetchFn: resolveModelsOauthProxyFetchFromEnv(),
       });
 
       spin.stop("Chutes OAuth complete");

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeEnv } from "../runtime.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
 
@@ -60,6 +60,35 @@ describe("loginOpenAICodexOAuth", () => {
     vi.clearAllMocks();
     mocks.runOpenAIOAuthTlsPreflight.mockResolvedValue({ ok: true });
     mocks.formatOpenAIOAuthTlsPreflightFix.mockReturnValue("tls fix");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("scopes OPENCLAW_MODELS_OAUTH_PROXY to oauth call and restores env", async () => {
+    const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
+      ?.env;
+    const priorHttpsProxy = env?.HTTPS_PROXY;
+    vi.stubEnv("OPENCLAW_MODELS_OAUTH_PROXY", "socks5://proxy.test:1080");
+
+    mocks.createVpsAwareOAuthHandlers.mockReturnValue({
+      onAuth: vi.fn(),
+      onPrompt: vi.fn(),
+    });
+    mocks.loginOpenAICodex.mockImplementation(async () => {
+      expect(env?.HTTPS_PROXY).toBe("socks5://proxy.test:1080");
+      return {
+        provider: "openai-codex" as const,
+        access: "access-token",
+        refresh: "refresh-token",
+        expires: Date.now() + 60_000,
+      };
+    });
+
+    await runCodexOAuth({ isRemote: false });
+
+    expect(env?.HTTPS_PROXY).toBe(priorHttpsProxy);
   });
 
   it("returns credentials on successful oauth login", async () => {
