@@ -1,7 +1,11 @@
 services:
   openclaw:
-    # Prefer official GHCR image. Override OPENCLAW_IMAGE in your Dokploy env.
-    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+    # Build from the current repository by default (your code).
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Optional override if you intentionally want a prebuilt remote image.
+    image: ${OPENCLAW_IMAGE:-openclaw:local}
     # Managed named volumes are often root-owned on first attach.
     # Run as root in Dokploy/Coollabs so /data remains writable.
     user: "0:0"
