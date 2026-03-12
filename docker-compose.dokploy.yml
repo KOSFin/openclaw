@@ -92,10 +92,10 @@ services:
       DOKPLOY_API_KEY: ${DOKPLOY_API_KEY:-}
 
   github-mcp:
-    image: ghcr.io/github/github-mcp-server:latest
-    environment:
-      GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PERSONAL_ACCESS_TOKEN}
-      MCP_TRANSPORT: http
+  image: ghcr.io/github/github-mcp-server:latest
+  command: ["server","http"]
+  environment:
+    GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PERSONAL_ACCESS_TOKEN}
 
 volumes:
   openclaw-data:
