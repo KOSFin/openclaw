@@ -83,6 +83,20 @@ services:
       timeout: 5s
       retries: 10
 
+  dokploy-mcp:
+    image: dokploy-mcp:latest
+    environment:
+      MCP_TRANSPORT: http
+      DOKPLOY_URL: ${DOKPLOY_URL:-}
+      DOKPLOY_API_KEY: ${DOKPLOY_API_KEY:-}
+    networks:
+      - dokploy-network
+
+
 volumes:
   openclaw-data:
   browser-data:
+
+networks:
+  dokploy-network:
+    external: true
