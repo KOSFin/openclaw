@@ -91,6 +91,10 @@ services:
       DOKPLOY_URL: ${DOKPLOY_URL:-}
       DOKPLOY_API_KEY: ${DOKPLOY_API_KEY:-}
 
+  github-mcp:
+    image: ghcr.io/github/github-mcp-server:latest
+    environment:
+      GITHUB_TOKEN: ${GITHUB_MCP_TOKEN}
 
 volumes:
   openclaw-data:
