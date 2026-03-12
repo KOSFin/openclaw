@@ -51,6 +51,8 @@ services:
       SLACK_BOT_TOKEN: ${SLACK_BOT_TOKEN:-}
       SLACK_APP_TOKEN: ${SLACK_APP_TOKEN:-}
 
+      GITHUB_MCP_AUTH: Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}
+
       # Gateway + Control UI listen on 18789 in this Dokploy profile.
       PORT: 18789
     volumes:
@@ -96,7 +98,6 @@ services:
     command: ["http"]
     environment:
       GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PERSONAL_ACCESS_TOKEN}
-
 
 volumes:
   openclaw-data:
