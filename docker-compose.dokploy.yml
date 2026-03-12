@@ -95,6 +95,7 @@ services:
     image: ghcr.io/github/github-mcp-server:latest
     environment:
       GITHUB_PERSONAL_ACCESS_TOKEN: ${GITHUB_PERSONAL_ACCESS_TOKEN}
+      MCP_TRANSPORT: http
 
 volumes:
   openclaw-data:
